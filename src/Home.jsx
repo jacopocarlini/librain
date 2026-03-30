@@ -155,11 +155,13 @@ export default function Home({ onOpenBook }) {
                         mb: 2.5,
                         borderRadius: 3,
                         boxShadow: '0px 4px 12px rgba(0,0,0,0.04)',
-                        overflow: 'visible' // Permette all'ombra della cover di uscire
+                        position: 'relative', // Fondamentale per posizionare l'IconButton
+                        overflow: 'visible'
                     }}>
+                        {/* L'area cliccabile ora contiene solo i dettagli del libro */}
                         <CardActionArea
                             onClick={() => onOpenBook(book.id)}
-                            sx={{ display: 'flex', alignItems: 'stretch', justifyContent: 'flex-start', p: 2 }}
+                            sx={{ display: 'flex', alignItems: 'stretch', justifyContent: 'flex-start', p: 2, pr: 6 }} // pr: 6 lascia spazio per l'icona
                         >
                             {/* COPERTINA */}
                             <Box sx={{
@@ -179,27 +181,15 @@ export default function Home({ onOpenBook }) {
                                 )}
                             </Box>
 
-                            {/* DETTAGLI LIBRO E PROGRESSO */}
+                            {/* DETTAGLI LIBRO */}
                             <Box sx={{ ml: 3, display: 'flex', flexDirection: 'column', flexGrow: 1, justifyContent: 'space-between' }}>
-                                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                                    <Box sx={{ pr: 2 }}>
-                                        <Typography variant="subtitle1" fontWeight="bold" sx={{ lineHeight: 1.2, mb: 0.5 }}>
-                                            {book.title}
-                                        </Typography>
-                                        <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'left' }}>
-                                            {book.author}
-                                        </Typography>
-                                    </Box>
-
-                                    {/* ICONA 3 PUNTINI (Previene il click della Card) */}
-                                    <IconButton
-                                        size="small"
-                                        onClick={(e) => handleMenuOpen(e, book.id)}
-                                        onMouseDown={(e) => e.stopPropagation()} // Importante per non aprire il libro
-                                        sx={{ mt: -1, mr: -1 }}
-                                    >
-                                        <MoreVertIcon />
-                                    </IconButton>
+                                <Box>
+                                    <Typography variant="subtitle1" fontWeight="bold" sx={{ lineHeight: 1.2, mb: 0.5, textAlign: 'left' }}>
+                                        {book.title}
+                                    </Typography>
+                                    <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'left' }}>
+                                        {book.author}
+                                    </Typography>
                                 </Box>
 
                                 {/* PROGRESS BAR */}
@@ -210,13 +200,27 @@ export default function Home({ onOpenBook }) {
                                         sx={{
                                             height: 6,
                                             borderRadius: 3,
-                                            bgcolor: 'rgba(94, 53, 177, 0.15)', // Sfondo lilla chiaro
-                                            '& .MuiLinearProgress-bar': { bgcolor: PURPLE } // Barra viola
+                                            bgcolor: 'rgba(94, 53, 177, 0.15)',
+                                            '& .MuiLinearProgress-bar': { bgcolor: PURPLE }
                                         }}
                                     />
                                 </Box>
                             </Box>
                         </CardActionArea>
+
+                        {/* L'IconButton è ora FUORI dalla CardActionArea, posizionato in modo assoluto */}
+                        <IconButton
+                            size="small"
+                            onClick={(e) => handleMenuOpen(e, book.id)}
+                            sx={{
+                                position: 'absolute',
+                                top: 8,
+                                right: 8,
+                                zIndex: 2 // Assicura che stia sopra la CardActionArea
+                            }}
+                        >
+                            <MoreVertIcon />
+                        </IconButton>
                     </Card>
                 ))}
 

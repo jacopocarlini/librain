@@ -2,18 +2,20 @@ import React, { useEffect, useRef, useState } from 'react';
 import ePub from 'epubjs';
 import { db } from './db';
 import {
-    AppBar, Toolbar, Typography, IconButton, Box, Slider, CircularProgress, Tooltip,
+    AppBar, Toolbar, Typography, IconButton, Box, Slider, CircularProgress,
     Dialog, DialogTitle, DialogContent, FormControl, InputLabel, Select, MenuItem,
-    ToggleButtonGroup, ToggleButton, Divider
+    ToggleButtonGroup, ToggleButton, Divider, Drawer, List, ListItem, ListItemButton, ListItemText
 } from '@mui/material';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import SettingsIcon from '@mui/icons-material/Settings';
+import FormatListBulletedIcon from '@mui/icons-material/FormatListBulleted';
 
 const PURPLE = '#5e35b1';
 
 export default function Reader({ bookId, onClose }) {
     const viewerRef = useRef(null);
     const bookRef = useRef(null);
+    const renditionRef = useRef(null);
 
     const [rendition, setRendition] = useState(null);
     const [bookTitle, setBookTitle] = useState('Caricamento...');
@@ -24,15 +26,20 @@ export default function Reader({ bookId, onClose }) {
     const [chapterStats, setChapterStats] = useState({ progress: 0, timeLeft: 'Calcolo...', title: '' });
     const [chaptersMarks, setChaptersMarks] = useState([]);
 
+    // Stato per l'Indice
+    const [toc, setToc] = useState([]);
+    const [isTocOpen, setIsTocOpen] = useState(false);
+    const [currentChapterIndex, setCurrentChapterIndex] = useState(-1);
+
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
     const [settings, setSettings] = useState({
         fontSize: 100, fontFamily: 'sans-serif', theme: 'light', flow: 'paginated'
     });
 
     const themeColors = {
-        light: { bg: '#ffffff', text: '#000000', barBg: '#ffffff' },
-        dark: { bg: '#121212', text: '#e0e0e0', barBg: '#121212' },
-        sepia: { bg: '#f4ecd8', text: '#5b4636', barBg: '#f4ecd8' }
+        light: { bg: '#ffffff', text: '#000000', barBg: '#ffffff', active: 'rgba(94, 53, 177, 0.08)' },
+        dark: { bg: '#121212', text: '#e0e0e0', barBg: '#121212', active: 'rgba(255, 255, 255, 0.08)' },
+        sepia: { bg: '#f4ecd8', text: '#5b4636', barBg: '#f4ecd8', active: 'rgba(91, 70, 54, 0.1)' }
     };
     const currentTheme = themeColors[settings.theme];
 
@@ -40,6 +47,7 @@ export default function Reader({ bookId, onClose }) {
     const lastTurnRef = useRef({ time: Date.now(), percent: 0 });
     const speedsRef = useRef([]);
 
+    // Orologio
     useEffect(() => {
         const timer = setInterval(() => {
             setTime(new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
@@ -47,6 +55,31 @@ export default function Reader({ bookId, onClose }) {
         return () => clearInterval(timer);
     }, []);
 
+    // Scroll automatico sul capitolo attivo nel Drawer
+    useEffect(() => {
+        if (isTocOpen && currentChapterIndex !== -1) {
+            setTimeout(() => {
+                const activeElement = document.getElementById(`toc-item-${currentChapterIndex}`);
+                if (activeElement) {
+                    activeElement.scrollIntoView({ block: 'center', behavior: 'smooth' });
+                }
+            }, 100);
+        }
+    }, [isTocOpen, currentChapterIndex]);
+
+    // Gestione Frecce Tastiera
+    useEffect(() => {
+        const handleKeyDown = (e) => {
+            if (isSettingsOpen || isTocOpen) return;
+            if (!renditionRef.current) return;
+            if (e.key === 'ArrowRight') renditionRef.current.next();
+            else if (e.key === 'ArrowLeft') renditionRef.current.prev();
+        };
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [isSettingsOpen, isTocOpen]);
+
+    // Applicazione Impostazioni (Tema, Font)
     useEffect(() => {
         if (rendition) {
             rendition.themes.select(settings.theme);
@@ -56,6 +89,7 @@ export default function Reader({ bookId, onClose }) {
         }
     }, [settings, rendition]);
 
+    // Inizializzazione Libro
     useEffect(() => {
         let isMounted = true;
         const loadBook = async () => {
@@ -67,150 +101,156 @@ export default function Reader({ bookId, onClose }) {
                 const bookInstance = ePub(bookData.file);
                 bookRef.current = bookInstance;
 
+                // allowScript: true previene gli errori della sandbox
                 const newRendition = bookInstance.renderTo(viewerRef.current, {
-                    width: '100%', height: '100%', spread: 'none', manager: 'continuous', flow: settings.flow
+                    width: '100%', height: '100%', spread: 'none', manager: 'continuous', flow: settings.flow,
+                    allowScript: true
                 });
 
                 newRendition.themes.register('light', { body: { background: '#ffffff', color: '#000000' } });
                 newRendition.themes.register('dark', { body: { background: '#121212', color: '#e0e0e0' } });
                 newRendition.themes.register('sepia', { body: { background: '#f4ecd8', color: '#5b4636' } });
 
-                newRendition.themes.select(settings.theme);
-                newRendition.themes.font(settings.fontFamily);
-                newRendition.themes.fontSize(`${settings.fontSize}%`);
-
                 setRendition(newRendition);
+                renditionRef.current = newRendition;
+
                 await newRendition.display(bookData.currentCfi || undefined);
                 if (!isMounted) return;
                 setIsBookReady(true);
 
-                // Navigazione a click
-                // --- LOGICA CLICK SUI LATI PER CAMBIARE PAGINA ---
-                // Navigazione tramite click/touch utilizzando screenX
+                // Click sui lati per cambiare pagina
                 newRendition.on('click', (e) => {
-                    // 1. Evitiamo il cambio pagina se l'utente sta selezionando del testo
                     const selection = e.view ? e.view.getSelection().toString() : '';
                     if (selection.length > 0) return;
-
-                    // 2. Funziona solo in modalità "paginated" (a pagine)
                     if (settings.flow !== 'paginated') return;
 
-                    // 3. Utilizziamo screenX per la coordinata orizzontale
                     const clickX = e.screenX;
-
-                    console.log('event', e);
-                    console.log('innerWidth', window.innerWidth);
-                    console.log('clientX', e.clientX);
-                    console.log('screenX', e.screenX);
-
-                    // 4. Per la larghezza dello schermo usiamo window.screen.width
-                    // per essere coerenti con screenX
                     const viewWidth = window.innerWidth;
-                    const sideZone = viewWidth * 0.5; // 30% ai lati
+                    const sideZone = viewWidth * 0.3;
 
-
-                    if (clickX < sideZone) {
-                        console.log('left');
-                        newRendition.prev();
-                    } else if (clickX > viewWidth - sideZone) {
-                        console.log('right');
-                        newRendition.next();
-                    }
+                    if (clickX < sideZone) newRendition.prev();
+                    else if (clickX > viewWidth - sideZone) newRendition.next();
                 });
 
+                // Cambio pagina con tastiera dentro l'iframe
+                newRendition.on('keydown', (e) => {
+                    if (e.key === 'ArrowRight') newRendition.next();
+                    if (e.key === 'ArrowLeft') newRendition.prev();
+                });
 
+                // Gestione spostamento e salvataggio posizione
                 newRendition.on('relocated', (locationData) => {
                     if (!isMounted) return;
-                    let updateData = { currentCfi: locationData.start.cfi };
+                    const currentCfi = locationData.start.cfi;
+                    const currentHref = locationData.start.href;
+                    let updateData = { currentCfi: currentCfi };
+
+                    const tocData = tocRef.current;
+                    if (tocData.length > 0) {
+                        let activeIndex = -1;
+
+                        // Cerchiamo l'indice in base all'href del file HTML corrente
+                        for (let i = 0; i < tocData.length; i++) {
+                            if (tocData[i].baseHref && currentHref && (tocData[i].baseHref.includes(currentHref) || currentHref.includes(tocData[i].baseHref))) {
+                                activeIndex = i;
+                                break;
+                            }
+                        }
+
+                        // Fallback sulla percentuale se l'href non fa match
+                        if (activeIndex === -1 && bookInstance.locations && bookInstance.locations.total > 0) {
+                            const pct = bookInstance.locations.percentageFromCfi(currentCfi);
+                            activeIndex = tocData.findIndex(c => c.percent > pct) - 1;
+                        }
+
+                        if (activeIndex < 0) activeIndex = 0;
+                        setCurrentChapterIndex(activeIndex);
+
+                        const currentChap = tocData[activeIndex];
+                        setChapterStats(prev => ({ ...prev, title: currentChap?.label || 'Capitolo' }));
+                    }
 
                     if (bookInstance.locations && bookInstance.locations.total > 0) {
-                        const currentPercent = bookInstance.locations.percentageFromCfi(locationData.start.cfi);
-                        const displayPercent = Math.round(currentPercent * 100);
-
+                        const currentPercent = bookInstance.locations.percentageFromCfi(currentCfi);
+                        const displayPercent = Number((currentPercent * 100).toFixed(1));
                         setBookProgress(displayPercent);
                         updateData.progress = displayPercent;
-
-                        const toc = tocRef.current;
-                        if (toc.length > 0) {
-                            let currentChapIndex = toc.findIndex(c => c.percent > currentPercent) - 1;
-                            if (currentChapIndex < 0) currentChapIndex = 0;
-
-                            const currentChap = toc[currentChapIndex];
-                            const nextChap = toc[currentChapIndex + 1] || { percent: 1.0 };
-
-                            const chapStart = currentChap ? currentChap.percent : 0;
-                            const chapEnd = nextChap.percent;
-
-                            let chapProg = 0;
-                            if (chapEnd > chapStart) chapProg = Math.round(((currentPercent - chapStart) / (chapEnd - chapStart)) * 100);
-
-                            const now = Date.now();
-                            const timeDiff = now - lastTurnRef.current.time;
-                            const percentDiff = currentPercent - lastTurnRef.current.percent;
-
-                            if (percentDiff > 0 && percentDiff < 0.05 && timeDiff > 1000 && timeDiff < 300000) {
-                                speedsRef.current = [...speedsRef.current, percentDiff / timeDiff].slice(-5);
-                            }
-                            lastTurnRef.current = { time: now, percent: currentPercent };
-
-                            let timeLeftStr = "...";
-                            if (speedsRef.current.length > 0) {
-                                const avgSpeed = speedsRef.current.reduce((a, b) => a + b, 0) / speedsRef.current.length;
-                                const remainingPercent = chapEnd - currentPercent;
-                                if (remainingPercent > 0 && avgSpeed > 0) {
-                                    const minsLeft = Math.ceil((remainingPercent / avgSpeed) / 60000);
-                                    timeLeftStr = minsLeft < 1 ? "< 1 min" : `${minsLeft} minuti`;
-                                } else {
-                                    timeLeftStr = "0 minuti";
-                                }
-                            } else {
-                                timeLeftStr = "Lettura in corso...";
-                            }
-
-                            setChapterStats({ progress: chapProg, timeLeft: timeLeftStr, title: currentChap?.label || 'Capitolo' });
-                        }
                     }
+
                     db.books.update(bookId, updateData);
                 });
 
                 await bookInstance.ready;
 
+                // Estrazione Indice Sicura
                 const extractToc = async () => {
                     const navigation = await bookInstance.loaded.navigation;
                     let tocData = [];
+
                     const processItem = (item) => {
-                        let pct = bookInstance.locations.percentageFromCfi(item.href);
-                        if (pct !== null && pct !== undefined) tocData.push({ label: item.label.trim(), percent: pct });
-                        if (item.subitems && item.subitems.length > 0) item.subitems.forEach(processItem);
+                        let safePct = 0;
+                        try {
+                            // Tentativo 1: usiamo la funzione nativa
+                            if (item.href && bookInstance.locations) {
+                                const exactPct = bookInstance.locations.percentageFromCfi(item.href);
+                                if (exactPct > 0) safePct = exactPct;
+                            }
+
+                            // Tentativo 2: PIANO B (questo salverà le tue tacche!)
+                            // Se la percentuale è ancora 0, calcoliamo in base all'ordine dei capitoli nel file
+                            if (safePct === 0 && item.href) {
+                                const hrefBase = item.href.split('#')[0];
+                                const spineItem = bookInstance.spine.get(hrefBase);
+                                if (spineItem) {
+                                    safePct = spineItem.index / bookInstance.spine.length;
+                                }
+                            }
+                        } catch (e) {
+                            // Ignoriamo gli errori di parsing
+                        }
+
+                        const baseHref = item.href ? item.href.split('#')[0] : '';
+                        tocData.push({
+                            label: item.label ? item.label.trim() : 'Capitolo',
+                            percent: safePct,
+                            href: item.href,
+                            baseHref: baseHref
+                        });
+
+                        if (item.subitems && item.subitems.length > 0) {
+                            item.subitems.forEach(processItem);
+                        }
                     };
+
                     navigation.toc.forEach(processItem);
-                    tocData.sort((a, b) => a.percent - b.percent);
-                    if (tocData.length === 0 || tocData[0].percent > 0) tocData.unshift({ label: 'Inizio', percent: 0 });
+
+                    if (tocData.length === 0) {
+                        tocData.unshift({ label: 'Inizio', percent: 0, href: null, baseHref: '' });
+                    }
 
                     tocRef.current = tocData;
-                    setChaptersMarks(tocData.map(c => ({ value: Math.round(c.percent * 100) })));
+                    setToc(tocData);
+
+                    // Ora i marks verranno generati e salvati correttamente!
+                    const marks = tocData
+                        .filter(c => c.percent > 0)
+                        .map(c => ({ value: Number((c.percent * 100).toFixed(1)) }));
+
+                    setChaptersMarks(marks);
                 };
 
                 if (bookData.locations) {
                     bookInstance.locations.load(bookData.locations);
                     await extractToc();
-                    newRendition.reportLocation();
                 } else {
                     await bookInstance.locations.generate(1600);
                     if (!isMounted) return;
                     await extractToc();
-                    db.books.update(bookId, { locations: bookInstance.locations.save(), totalPages: bookInstance.locations.length });
-                    newRendition.reportLocation();
+                    db.books.update(bookId, { locations: bookInstance.locations.save() });
                 }
+                newRendition.reportLocation();
 
-                newRendition.on('keyup', (e) => {
-                    if (e.key === 'ArrowLeft') newRendition.prev();
-                    if (e.key === 'ArrowRight') newRendition.next();
-                });
-
-            } catch (error) {
-                console.error("Errore:", error);
-            }
+            } catch (error) { console.error("Errore caricamento libro:", error); }
         };
 
         loadBook();
@@ -218,11 +258,21 @@ export default function Reader({ bookId, onClose }) {
     }, [bookId]);
 
     const handleSliderChange = (event, newValue) => setBookProgress(newValue);
+
     const handleSliderCommitted = async (event, newValue) => {
-        const book = bookRef.current;
-        if (!rendition || !book || book.locations.total === 0) return;
-        const cfi = book.locations.cfiFromPercentage(newValue / 100);
-        if (cfi) await rendition.display(cfi);
+        if (!renditionRef.current || !bookRef.current) return;
+        const cfi = bookRef.current.locations.cfiFromPercentage(newValue / 100);
+        if (cfi) await renditionRef.current.display(cfi);
+    };
+
+    const goToChapter = async (chapter) => {
+        setIsTocOpen(false);
+        if (chapter.href) {
+            await renditionRef.current.display(chapter.href);
+        } else if (chapter.percent > 0) {
+            const cfi = bookRef.current.locations.cfiFromPercentage(chapter.percent);
+            if (cfi) await renditionRef.current.display(cfi);
+        }
     };
 
     const updateSetting = (key, value) => setSettings(prev => ({ ...prev, [key]: value }));
@@ -230,26 +280,28 @@ export default function Reader({ bookId, onClose }) {
     return (
         <Box sx={{ display: 'flex', flexDirection: 'column', height: '100vh', bgcolor: currentTheme.bg, color: currentTheme.text, overflow: 'hidden', transition: 'background-color 0.3s' }}>
 
-            {/* TOP BAR FIGMA STYLE */}
+            {/* TOP BAR */}
             <AppBar position="static" elevation={0} sx={{ bgcolor: currentTheme.barBg, color: currentTheme.text, borderBottom: `1px solid ${settings.theme === 'dark' ? '#333' : '#eee'}` }}>
                 <Toolbar sx={{ px: { xs: 1, sm: 2 } }}>
-                    <IconButton edge="start" color="inherit" onClick={onClose} aria-label="back">
+                    <IconButton edge="start" color="inherit" onClick={onClose}>
                         <ArrowBackIcon />
                     </IconButton>
 
-                    {/* Testi Centrali */}
+                    <IconButton color="inherit" onClick={() => setIsTocOpen(true)} sx={{ ml: 1 }}>
+                        <FormatListBulletedIcon />
+                    </IconButton>
+
                     <Box sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', mx: 2, overflow: 'hidden' }}>
-                        <Typography variant="body1" noWrap sx={{ fontWeight: 500, fontSize: '1rem', width: '100%', textAlign: 'center' }}>
+                        <Typography variant="body1" noWrap sx={{ fontWeight: 500, fontSize: '0.95rem', width: '100%', textAlign: 'center' }}>
                             {bookTitle}
                         </Typography>
-                        <Typography variant="caption" noWrap sx={{ color: 'text.secondary', fontSize: '0.75rem', width: '100%', textAlign: 'center' }}>
+                        <Typography variant="caption" noWrap sx={{ color: 'text.secondary', fontSize: '0.7rem', width: '100%', textAlign: 'center' }}>
                             {chapterStats.title}
                         </Typography>
                     </Box>
 
-                    {/* Lato Destro (Orologio + Impostazioni) */}
                     <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                        <Typography variant="body2" color="text.secondary" sx={{ mr: 1, fontSize: '0.85rem' }}>
+                        <Typography variant="body2" color="text.secondary" sx={{ mr: 1, fontSize: '0.85rem', display: { xs: 'none', sm: 'block' } }}>
                             {time}
                         </Typography>
                         <IconButton color="inherit" onClick={() => setIsSettingsOpen(true)} size="small">
@@ -259,48 +311,97 @@ export default function Reader({ bookId, onClose }) {
                 </Toolbar>
             </AppBar>
 
+            {/* VIEWER PRINCIPALE */}
             <Box sx={{ flexGrow: 1, position: 'relative', width: '100%' }}>
                 {!isBookReady && (
                     <Box sx={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', zIndex: 20, bgcolor: currentTheme.bg }}>
                         <CircularProgress size={40} sx={{ color: PURPLE }} />
                     </Box>
                 )}
-                <Box
-                    ref={viewerRef}
-                    sx={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, px: { xs: 2, sm: 4 }, py: 2 }}
-                />
+                <Box ref={viewerRef} sx={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, px: { xs: 1, sm: 4 }, py: 1 }} />
             </Box>
 
-            {/* BOTTOM BAR FIGMA STYLE */}
-            <Box sx={{ p: 2, bgcolor: currentTheme.barBg, borderTop: `1px solid ${settings.theme === 'dark' ? '#333' : 'transparent'}` }}>
+            {/* BARRA DI AVANZAMENTO (SLIDER) */}
+            <Box sx={{ p: 2, bgcolor: currentTheme.barBg }}>
                 <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', maxWidth: 600, mx: 'auto' }}>
-                    {/*<Typography variant="caption" sx={{ color: 'text.secondary', mb: 1, fontSize: '0.75rem' }}>*/}
-                    {/*    {chapterStats.timeLeft.includes('Lettura') ? chapterStats.timeLeft : `${chapterStats.timeLeft} per finire il capitolo`}*/}
-                    {/*</Typography>*/}
-
                     <Slider
                         value={bookProgress}
                         marks={chaptersMarks}
+                        step={0.1}
                         onChange={handleSliderChange}
                         onChangeCommitted={handleSliderCommitted}
                         sx={{
-                            padding: '0 !important',
+                            padding: '13px 0 !important',
                             color: PURPLE,
-                            height: 6,
-                            '& .MuiSlider-thumb': { display: 'auto' }, // Niente pallino, stile flat
-                            '& .MuiSlider-track': { border: 'auto' },
-                            '& .MuiSlider-rail': { bgcolor: settings.theme === 'dark' ? '#333' : '#e0e0e0', opacity: 1 },
-                            '& .MuiSlider-mark': { height: 8, width: 2, backgroundColor: currentTheme.bg, mt: -0.25 },
+                            height: 6, // Altezza della barra
+                            '& .MuiSlider-thumb': {
+                                width: 14,
+                                height: 14,
+                                '&:focus, &:hover, &.Mui-active, &.Mui-focusVisible': {
+                                    boxShadow: `0px 0px 0px 8px ${PURPLE}33`,
+                                },
+                            },
+                            '& .MuiSlider-rail': {
+                                bgcolor: settings.theme === 'dark' ? '#333' : '#e0e0e0',
+                                opacity: 1
+                            },
+                            '& .MuiSlider-track': {
+                                border: 'none'
+                            },
+                            // --- STILE TACCHE YOUTUBE ---
+                            '& .MuiSlider-mark': {
+                                height: 6, // Stessa altezza della barra
+                                width: 3,  // Spessore del "taglio" (aumentalo a 4 se lo vuoi più netto)
+                                backgroundColor: currentTheme.barBg, // Fonde il segno con lo sfondo
+                                opacity: 1,
+                            },
+                            '& .MuiSlider-markActive': {
+                                backgroundColor: currentTheme.barBg, // Mantiene il taglio sulla parte viola
+                                opacity: 1,
+                            }
                         }}
                     />
                 </Box>
             </Box>
 
-            {/* MENU IMPOSTAZIONI */}
+            {/* DRAWER INDICE (ToC) */}
+            <Drawer anchor="left" open={isTocOpen} onClose={() => setIsTocOpen(false)}>
+                <Box sx={{ width: 280, bgcolor: currentTheme.barBg, color: currentTheme.text, height: '100%', display: 'flex', flexDirection: 'column' }}>
+                    <Typography variant="h6" sx={{ p: 2, fontWeight: 600, borderBottom: `1px solid ${settings.theme === 'dark' ? '#333' : '#eee'}` }}>
+                        Indice
+                    </Typography>
+                    <List sx={{ flexGrow: 1, overflowY: 'auto', p: 0 }}>
+                        {toc.map((chapter, index) => (
+                            <ListItem key={index} disablePadding divider>
+                                <ListItemButton
+                                    id={`toc-item-${index}`} // Serve per l'auto-scroll
+                                    onClick={() => goToChapter(chapter)}
+                                    sx={{
+                                        py: 1.5,
+                                        borderLeft: currentChapterIndex === index ? `4px solid ${PURPLE}` : '4px solid transparent',
+                                        bgcolor: currentChapterIndex === index ? currentTheme.active : 'transparent',
+                                        '&:hover': { bgcolor: currentTheme.active }
+                                    }}
+                                >
+                                    <ListItemText
+                                        primary={chapter.label}
+                                        primaryTypographyProps={{
+                                            fontSize: '0.9rem',
+                                            fontWeight: currentChapterIndex === index ? 'bold' : 'normal',
+                                            color: currentChapterIndex === index ? PURPLE : currentTheme.text
+                                        }}
+                                    />
+                                </ListItemButton>
+                            </ListItem>
+                        ))}
+                    </List>
+                </Box>
+            </Drawer>
+
+            {/* MODALE IMPOSTAZIONI */}
             <Dialog open={isSettingsOpen} onClose={() => setIsSettingsOpen(false)} maxWidth="xs" fullWidth>
                 <DialogTitle>Impostazioni</DialogTitle>
                 <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 3, pt: 2 }}>
-                    {/* Stessi controlli tema, carattere e dimensioni di prima... */}
                     <Box>
                         <Typography variant="caption" color="text.secondary">Tema</Typography>
                         <ToggleButtonGroup value={settings.theme} exclusive onChange={(e, val) => val && updateSetting('theme', val)} fullWidth size="small">
@@ -312,7 +413,7 @@ export default function Reader({ bookId, onClose }) {
                     <Box>
                         <Typography variant="caption" color="text.secondary">Scorrimento</Typography>
                         <ToggleButtonGroup value={settings.flow} exclusive onChange={(e, val) => val && updateSetting('flow', val)} fullWidth size="small">
-                            <ToggleButton value="paginated">A Pagine</ToggleButton>
+                            <ToggleButton value="paginated">Pagine</ToggleButton>
                             <ToggleButton value="scrolled-doc">Continuo</ToggleButton>
                         </ToggleButtonGroup>
                     </Box>
@@ -331,7 +432,6 @@ export default function Reader({ bookId, onClose }) {
                     </Box>
                 </DialogContent>
             </Dialog>
-
         </Box>
     );
 }
