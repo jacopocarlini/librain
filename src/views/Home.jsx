@@ -48,12 +48,20 @@ export default function Home({ onOpenBook }) {
     };
 
     return (
-        <Box sx={{ flexGrow: 1, bgcolor: '#f4f4f9', minHeight: '100vh', pb: 4 }}>
+        // 1. Box Principale: Altezza fissa, niente scroll globale
+        <Box sx={{
+            display: 'flex',
+            flexDirection: 'column',
+            height: '100svh',
+            bgcolor: '#f4f4f9',
+            overflow: 'hidden' // Blocca lo scroll del body
+        }}>
             <Backdrop sx={{ color: '#fff', zIndex: 2000, flexDirection: 'column', gap: 2 }} open={isImporting}>
                 <CircularProgress color="inherit" />
                 <Typography>Analisi del libro in corso...</Typography>
             </Backdrop>
 
+            {/* 2. AppBar: Rimane statica in alto */}
             <AppBar position="static" elevation={0} sx={{ bgcolor: PURPLE }}>
                 <Toolbar sx={{ px: { xs: 2, sm: 4 } }}>
                     <Typography variant="h6" sx={{ flexGrow: 1, fontWeight: 'bold' }}>GemBook</Typography>
@@ -69,25 +77,32 @@ export default function Home({ onOpenBook }) {
                 </Toolbar>
             </AppBar>
 
-            <Container maxWidth="md" sx={{ mt: 4 }}>
-                {books.map(book => (
-                    <BookCard
-                        key={book.id}
-                        book={book}
-                        purpleColor={PURPLE}
-                        onOpen={onOpenBook}
-                        onMenuOpen={(e, id) => setMenuState({ anchor: e.currentTarget, bookId: id })}
-                    />
-                ))}
+            {/* 3. Area Contenuti: Occupa il resto dello spazio ed è l'unica a scrollare */}
+            <Box sx={{
+                flexGrow: 1,
+                overflowY: 'auto', // Abilita lo scroll solo qui dentro
+                pb: 4
+            }}>
+                <Container maxWidth="md" sx={{ mt: 4 }}>
+                    {books.map(book => (
+                        <BookCard
+                            key={book.id}
+                            book={book}
+                            purpleColor={PURPLE}
+                            onOpen={onOpenBook}
+                            onMenuOpen={(e, id) => setMenuState({ anchor: e.currentTarget, bookId: id })}
+                        />
+                    ))}
 
-                <Menu
-                    anchorEl={menuState.anchor}
-                    open={Boolean(menuState.anchor)}
-                    onClose={() => setMenuState({ anchor: null, bookId: null })}
-                >
-                    <MenuItem onClick={handleDelete} sx={{ color: 'error.main' }}>Elimina libro</MenuItem>
-                </Menu>
-            </Container>
+                    <Menu
+                        anchorEl={menuState.anchor}
+                        open={Boolean(menuState.anchor)}
+                        onClose={() => setMenuState({ anchor: null, bookId: null })}
+                    >
+                        <MenuItem onClick={handleDelete} sx={{ color: 'error.main' }}>Elimina libro</MenuItem>
+                    </Menu>
+                </Container>
+            </Box>
         </Box>
     );
 }

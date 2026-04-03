@@ -117,7 +117,7 @@ export default function Reader({bookId, onClose}) {
         <Box sx={{
             display: 'flex',
             flexDirection: 'column',
-            height: '100vh',
+            height: '100dvh',
             bgcolor: currentTheme.bg,
             color: currentTheme.text,
             overflow: 'hidden'
@@ -162,7 +162,6 @@ export default function Reader({bookId, onClose}) {
                     <IconButton
                         onClick={() => epubService.prev()}
                         sx={{
-                            position: 'absolute',
                             left: {xs: 2, sm: 16},
                             zIndex: 10,
                             bgcolor: currentTheme.barBg,
@@ -200,7 +199,6 @@ export default function Reader({bookId, onClose}) {
                     <IconButton
                         onClick={() => epubService.next()}
                         sx={{
-                            position: 'absolute',
                             right: {xs: 2, sm: 16},
                             zIndex: 10,
                             bgcolor: currentTheme.barBg,

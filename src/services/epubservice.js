@@ -206,8 +206,9 @@ class EpubService {
             percentage = this.book.locations.percentageFromCfi(currentCfi);
             console.log("-----------------------")
             console.log(this.bookData.toc);
-            const max = this.bookData.toc[activeIndex + 1].percentage - this.bookData.toc[activeIndex].percent;
-            let chapterEndPercent = this.bookData.toc[activeIndex + 1].percent || 1;
+            let chapterStartPercent = this.bookData.toc[activeIndex].percentage || 1;;
+            let chapterEndPercent = this.bookData.toc[activeIndex + 1].percentage || 1;;
+            const max = chapterEndPercent - chapterStartPercent;
             console.log(`io sono a ${percentage * 100}%`);
             console.log(`il capitolo finisce a ${chapterEndPercent * 100}%`);
 
