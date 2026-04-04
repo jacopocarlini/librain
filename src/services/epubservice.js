@@ -58,8 +58,8 @@ export const processEpubFile = async (file) => {
                 navigation.toc.forEach(item => processItem(item, 0));
 
                 const result = {
-                    title: metadata.title || 'Titolo Sconosciuto',
-                    author: metadata.creator || 'Autore Sconosciuto',
+                    title: metadata.title || null,
+                    author: metadata.creator || null,
                     file: bookData,
                     cover: persistentCover,
                     locations: savedLocations,
@@ -161,72 +161,58 @@ class EpubService {
         const currentCfi = locationData.start.cfi;
         const percentage = this.book.locations?.percentageFromCfi(currentCfi) || 0;
 
-        let minutesLeftStr = '-- min';
+        // Inizializziamo i dati temporali come nulli
+        let timeStats = {
+            chapterMinutes: 0,
+            totalMinutes: 0,
+            isFinished: false
+        };
 
         if (this.book.locations && this.book.locations.length() > 0) {
-            // 1. Dati base per i calcoli
             const currentLoc = this.book.locations.locationFromCfi(currentCfi);
             const totalLocations = this.book.locations.length();
 
-            // 2. Calcolo per l'intero LIBRO
+            // Calcolo minuti totali
             const remainingBookLocations = Math.max(0, totalLocations - currentLoc);
-            const estBookMinutes = Math.round(remainingBookLocations / 15);
+            timeStats.totalMinutes = Math.round(remainingBookLocations / 15);
 
-            // 3. Calcolo per il CAPITOLO
+            // Calcolo minuti capitolo
             const nextChapterIndex = locationData.start.index + 1;
             const nextChapter = this.book.spine.get(nextChapterIndex);
+            let endOfChapterLoc = totalLocations;
 
-            let endOfChapterLoc = totalLocations; // Default: se è l'ultimo cap, la fine è la fine del libro
-
-            // Troviamo la location di inizio del prossimo capitolo
             if (nextChapter && nextChapter.href) {
-                // Epub.js può ricavare la location dal CFI base dell'elemento della spine
                 const nextChapterBaseCfi = `epubcfi(${nextChapter.cfiBase}!/4/1:0)`;
                 const nextLoc = this.book.locations.locationFromCfi(nextChapterBaseCfi);
-                // Se la location è valida, aggiorniamo la fine del capitolo
-                if (nextLoc && nextLoc > -1) {
-                    endOfChapterLoc = nextLoc;
-                }
+                if (nextLoc && nextLoc > -1) endOfChapterLoc = nextLoc;
             }
 
             const remainingChapterLocations = Math.max(0, endOfChapterLoc - currentLoc);
-            const estChapMinutes = Math.round(remainingChapterLocations / 15);
+            timeStats.chapterMinutes = Math.round(remainingChapterLocations / 15);
 
-            // 4. Funzione Helper per formattare il testo (es. 65 min -> 1h 5m)
-            const formatTime = (mins) => {
-                if (mins <= 0) return '< 1m';
-                if (mins < 60) return `${mins}m`;
-                const h = Math.floor(mins / 60);
-                const m = mins % 60;
-                return m > 0 ? `${h}h ${m}m` : `${h}h`;
-            };
-
-            // 5. Creazione della stringa combinata
-            if (percentage >= 0.99) {
-                minutesLeftStr = 'Finito';
-            } else {
-                // Esempio output: "12m cap • 3h 15m tot"
-                minutesLeftStr = `${formatTime(estChapMinutes)} cap • ${formatTime(estBookMinutes)} tot`;
-            }
+            if (percentage >= 0.99) timeStats.isFinished = true;
         }
 
-        // Identificazione titolo capitolo nel TOC
+        // Identificazione titolo capitolo
+        let chapterTitle = null;
         let activeIndex = -1;
         if (this.bookData?.toc) {
             const cleanHref = locationData.start.href.split('#')[0];
             activeIndex = this.bookData.toc.findIndex(item => item.href.includes(cleanHref));
+            if (activeIndex !== -1) chapterTitle = this.bookData.toc[activeIndex].label;
         }
 
         if (callback) {
             callback({
                 cfi: currentCfi,
                 percentage: Number((percentage * 100).toFixed(1)),
-                chapterTitle: activeIndex !== -1 ? this.bookData.toc[activeIndex].label : 'Capitolo',
+                chapterTitle: chapterTitle, // Ritorna null se non trovato
                 chapterIndex: activeIndex,
-                timeLeft: minutesLeftStr
+                timeStats: timeStats // <-- Passiamo l'oggetto con i numeri puri
             });
         }
     }
+
     applySettings(settings) {
         if (!this.rendition) return;
         this.currentSettings = settings;

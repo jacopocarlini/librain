@@ -6,13 +6,16 @@ import {
 import SettingsIcon from '@mui/icons-material/Settings';
 import SearchIcon from '@mui/icons-material/Search';
 import MoreVertIcon from '@mui/icons-material/MoreVert';
-import AddIcon from '@mui/icons-material/Add'; // <-- Nuovo import necessario
+import AddIcon from '@mui/icons-material/Add';
 import { db } from '../services/db';
 import { processEpubFile } from '../services/epubService';
 import { BookCard } from './BookCard';
 import { SettingsDrawer } from './Settings';
+import { useTranslation } from 'react-i18next'; // <-- Import per le traduzioni
 
 export default function Home({ onOpenBook, settings, setSettings, themeStyles }) {
+    const { t } = useTranslation(); // <-- Inizializzazione hook traduzioni
+
     const [books, setBooks] = useState([]);
     const [isImporting, setIsImporting] = useState(false);
     const [tabValue, setTabValue] = useState(0);
@@ -46,7 +49,7 @@ export default function Home({ onOpenBook, settings, setSettings, themeStyles })
             const id = await db.books.add(processedBook);
             setBooks(prev => [...prev, { ...processedBook, id }]);
         } catch (error) {
-            alert("Errore nell'importazione");
+            alert(t('import_error')); // <-- Alert tradotto
         } finally {
             setIsImporting(false);
             event.target.value = '';
@@ -54,7 +57,7 @@ export default function Home({ onOpenBook, settings, setSettings, themeStyles })
     };
 
     const handleDelete = async () => {
-        if (window.confirm("Eliminare definitivamente questo libro?")) {
+        if (window.confirm(t('delete_confirm'))) { // <-- Conferma tradotta
             await db.books.delete(menuState.bookId);
             setBooks(prev => prev.filter(b => b.id !== menuState.bookId));
         }
@@ -82,7 +85,7 @@ export default function Home({ onOpenBook, settings, setSettings, themeStyles })
             <AppBar position="static" elevation={0} sx={{ bgcolor: 'transparent', py: { xs: 1, sm: 2 } }}>
                 <Toolbar sx={{ px: { xs: 2, sm: 6 }, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 1 }}>
 
-                    {/* LOGO AREA - Responsive flex */}
+                    {/* LOGO AREA */}
                     <Box sx={{ display: 'flex', alignItems: 'center', flex: { xs: 1, md: 'none' }, minWidth: { md: '150px' } }}>
                         <img src="/gembook/icon.png" alt="Logo" style={{ width: 35, height: 35 }} />
                         <Typography variant="h6" sx={{ color: themeStyles.text, fontWeight: 800, ml: 1.5, display: { xs: 'block', sm: 'block' } }}>
@@ -90,7 +93,7 @@ export default function Home({ onOpenBook, settings, setSettings, themeStyles })
                         </Typography>
                     </Box>
 
-                    {/* CENTER ACTIONS (Search Desktop + Add Book) */}
+                    {/* CENTER ACTIONS */}
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: { xs: 1, sm: 2 }, flexGrow: { md: 1 }, justifyContent: { xs: 'flex-end', md: 'center' } }}>
 
                         {/* Search Desktop */}
@@ -104,14 +107,14 @@ export default function Home({ onOpenBook, settings, setSettings, themeStyles })
                         }}>
                             <SearchIcon sx={{ color: 'grey.400', fontSize: 20, mr: 1 }} />
                             <InputBase
-                                placeholder="Search books..."
+                                placeholder={t('search_placeholder')} // <-- Tradotto
                                 value={searchQuery}
                                 onChange={(e) => setSearchQuery(e.target.value)}
                                 sx={{ flex: 1, fontSize: '0.9rem', color: themeStyles.text }}
                             />
                         </Box>
 
-                        {/* Add Book Button - Icona su Mobile, Testo su Desktop */}
+                        {/* Add Book Button */}
                         <Button
                             component="label"
                             variant="contained"
@@ -126,7 +129,7 @@ export default function Home({ onOpenBook, settings, setSettings, themeStyles })
                             }}
                         >
                             <AddIcon sx={{ display: { xs: 'block', sm: 'block' } }} />
-                            <Box sx={{ display: { xs: 'block', sm: 'block' } }}>Add Book</Box>
+                            <Box sx={{ display: { xs: 'block', sm: 'block' } }}>{t('add_book')}</Box> {/* <-- Tradotto */}
                             <input type="file" accept=".epub" hidden onChange={handleImport} />
                         </Button>
                     </Box>
@@ -143,7 +146,7 @@ export default function Home({ onOpenBook, settings, setSettings, themeStyles })
             <Box sx={{ flexGrow: 1, overflowY: 'auto', mt: { xs: 1, sm: 2 } }}>
                 <Container maxWidth="md">
 
-                    {/* Search Mobile - Visibile solo su schermi piccoli */}
+                    {/* Search Mobile */}
                     <Box sx={{
                         display: { xs: 'flex', md: 'none' },
                         bgcolor: themeStyles.card,
@@ -153,14 +156,14 @@ export default function Home({ onOpenBook, settings, setSettings, themeStyles })
                     }}>
                         <SearchIcon sx={{ color: 'grey.400', fontSize: 20, mr: 1 }} />
                         <InputBase
-                            placeholder="Search books..."
+                            placeholder={t('search_placeholder')} // <-- Tradotto
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
                             sx={{ flex: 1, fontSize: '0.9rem', color: themeStyles.text }}
                         />
                     </Box>
 
-                    {/* TABS - Rese scrollabili */}
+                    {/* TABS */}
                     <Box sx={{ display: 'flex', justifyContent: 'center', mb: { xs: 4, sm: 6 } }}>
                         <Tabs
                             value={tabValue}
@@ -174,10 +177,11 @@ export default function Home({ onOpenBook, settings, setSettings, themeStyles })
                                 '& .MuiTabs-indicator': { display: 'none' }
                             }}
                         >
-                            {['All Books', 'To Read', 'Finished'].map((label) => (
+                            {/* Cicliamo sulle chiavi di traduzione anziché su stringhe fisse */}
+                            {['tab_all', 'tab_to_read', 'tab_finished'].map((tabKey) => (
                                 <Tab
-                                    key={label}
-                                    label={label}
+                                    key={tabKey}
+                                    label={t(tabKey)} // <-- Tradotto
                                     sx={{
                                         borderRadius: '12px', textTransform: 'none', fontWeight: 'bold',
                                         minWidth: { xs: 'auto', sm: 120 },
@@ -211,12 +215,10 @@ export default function Home({ onOpenBook, settings, setSettings, themeStyles })
                                 mt: 2
                             }}>
                                 <Typography variant="h6" sx={{ color: themeStyles.text, fontWeight: 'bold', mb: 1 }}>
-                                    {books.length === 0 ? "La tua libreria è vuota" : "Nessun libro trovato"}
+                                    {books.length === 0 ? t('empty_library_title') : t('empty_search_title')}
                                 </Typography>
                                 <Typography variant="body2" sx={{ color: 'grey.500', maxWidth: '300px', mx: 'auto' }}>
-                                    {books.length === 0
-                                        ? "Tocca il pulsante '+ Add Book' in alto per importare il tuo primo file .epub."
-                                        : "Prova a cambiare i termini di ricerca o la tab selezionata per trovare il tuo libro."}
+                                    {books.length === 0 ? t('empty_library_desc') : t('empty_search_desc')}
                                 </Typography>
                             </Box>
                         )}
@@ -239,13 +241,13 @@ export default function Home({ onOpenBook, settings, setSettings, themeStyles })
                 }}
             >
                 <MenuItem onClick={handleDelete} sx={{ color: 'error.main', fontWeight: 'bold', fontSize: '0.9rem', px: 3 }}>
-                    Elimina libro
+                    {t('delete_book')} {/* <-- Tradotto */}
                 </MenuItem>
             </Menu>
 
             <Backdrop sx={{ color: '#fff', zIndex: 2000, flexDirection: 'column', gap: 2 }} open={isImporting}>
                 <CircularProgress color="inherit" />
-                <Typography>Analisi in corso...</Typography>
+                <Typography>{t('importing_book')}</Typography> {/* <-- Tradotto */}
             </Backdrop>
         </Box>
     );

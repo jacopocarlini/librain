@@ -33,8 +33,9 @@ export const BookCard = ({ book, onOpen, onMenuOpen, themeStyles }) => (
                 {book.cover ? (
                     <img src={book.cover} alt="Cover" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
                 ) : (
-                    <Typography variant="caption">No Cover</Typography>
-                )}
+                    <Typography variant="caption" sx={{ color: 'grey.600', px: 1 }}>
+                        {t('no_cover')}
+                    </Typography>                )}
             </Box>
 
             {/* Testi Allineati a Sinistra */}
