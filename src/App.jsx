@@ -43,7 +43,11 @@ const resources = {
             "cap_label": "cap",
             "tot_label": "tot",
             "finished": "Finito",
-            "time_separator": "•"
+            "time_separator": "•",
+
+            "selection_title": "Selezione",
+            "save_note": "Salva nota",
+            "copy": "Copia",
         }
     },
     en: {
@@ -83,7 +87,10 @@ const resources = {
             "cap_label": "cap",
             "tot_label": "tot",
             "finished": "Finished",
-            "time_separator": "•"
+            "time_separator": "•",
+            "selection_title": "Selection",
+            "save_note": "Save Note",
+            "copy": "Copy",
         }
     }
 };

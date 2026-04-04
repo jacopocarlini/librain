@@ -95,8 +95,7 @@ class EpubService {
         this.currentSettings = null;
     }
 
-    async init({bookData, elementId, settings, onReady, onRelocated}) {
-        // 1. Distruzione totale
+    async init({ bookData, elementId, settings, onReady, onRelocated, onSelected }) {        // 1. Distruzione totale
         if (this.rendition) {
             this.rendition.destroy();
             this.rendition = null;
@@ -150,6 +149,19 @@ class EpubService {
 
         await this.rendition.display(bookData.currentCfi || undefined);
 
+        this.rendition.hooks.content.register((contents) => {
+            const doc = contents.document;
+
+            // Blocca il menù contestuale (tasto destro o pressione prolungata)
+            doc.addEventListener('contextmenu', (e) => {
+                e.preventDefault();
+                return false;
+            }, { capture: true });
+
+            // Gestione Custom Selection (opzionale per il tuo menù futuro)
+            // Se vorrai gestire la selezione "manuale", userai l'evento 'selected' di epub.js
+        });
+
         if (onReady) onReady();
 
         this.rendition.on('relocated', (data) => this.handleRelocated(data, onRelocated));
@@ -164,7 +176,30 @@ class EpubService {
             const x = e.clientX % width;
             if (x < width * 0.25) this.prev();
             else if (x > width * 0.75) this.next();
+            if (onSelected) onSelected(null);
+
         });
+
+        this.rendition.on("contextmenu", (e) => {
+            e.preventDefault();
+        });
+
+            this.rendition.on('selected', (cfiRange, contents) => {
+                console.log(cfiRange);
+                const selection = contents.window.getSelection();
+                const range = selection.getRangeAt(0);
+                const rect = range.getBoundingClientRect();
+                const text = selection.toString();
+
+                if (text && text.trim().length > 0 && onSelected) {
+                    // Passiamo il testo e le coordinate al componente React
+                    onSelected({
+                        text: text,
+                        cfiRange: cfiRange,
+                        rect: rect // Contiene top, left, width, height
+                    });
+                }
+            });
     }
 
     handleRelocated(locationData, callback) {
@@ -259,9 +294,20 @@ class EpubService {
                     ${fontStack}
                     line-height: 1.6 !important;
                     margin: 0 !important;
-                
-                    /* Rimuove il flash blu al tocco su Chrome/Android */
+                    
+                    /* BLOCCA SELEZIONE E COPIA DI SISTEMA */
+                    -webkit-user-select: none !important;
+                    -moz-user-select: none !important;
+                    -ms-user-select: none !important;
+                    user-select: none !important;
+            
+                    /* Rimuove il flash blu al tocco */
                     -webkit-tap-highlight-color: transparent;
+                }
+                
+                /* Impedisce anche il menù contestuale classico (tasto destro / pressione lunga) */
+                * {
+                    -webkit-touch-callout: none !important;
                 }
                 
                 /* Applichiamo l'allineamento solo se scelto nei settings */
