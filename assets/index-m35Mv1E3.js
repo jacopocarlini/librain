@@ -183,13 +183,13 @@ To suppress this warning, you need to explicitly provide the \`palette.${n}Chann
                     line-height: 1.6 !important;
                     margin: 0 !important;
                     
-                    /* DISATTIVA il menù di sistema su iOS/Android */
-                    -webkit-touch-callout: none !important; 
-                    
-                    /* PERMETTE la selezione del testo (altrimenti il tuo menù non saprebbe cosa hai scelto) */
-                    -webkit-user-select: text !important;
-                    user-select: text !important;
+                    /* BLOCCA SELEZIONE E COPIA DI SISTEMA */
+                    -webkit-user-select: none !important;
+                    -moz-user-select: none !important;
+                    -ms-user-select: none !important;
+                    user-select: none !important;
             
+                    /* Rimuove il flash blu al tocco */
                     -webkit-tap-highlight-color: transparent;
                 }
                 
@@ -239,13 +239,13 @@ To suppress this warning, you need to explicitly provide the \`palette.${n}Chann
                     line-height: 1.6 !important;
                     margin: 0 !important;
                     
-                    /* DISATTIVA il menù di sistema su iOS/Android */
-                    -webkit-touch-callout: none !important; 
-                    
-                    /* PERMETTE la selezione del testo (altrimenti il tuo menù non saprebbe cosa hai scelto) */
-                    -webkit-user-select: text !important;
-                    user-select: text !important;
+                    /* BLOCCA SELEZIONE E COPIA DI SISTEMA */
+                    -webkit-user-select: none !important;
+                    -moz-user-select: none !important;
+                    -ms-user-select: none !important;
+                    user-select: none !important;
             
+                    /* Rimuove il flash blu al tocco */
                     -webkit-tap-highlight-color: transparent;
                 }
                 
