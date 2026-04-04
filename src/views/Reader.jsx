@@ -58,6 +58,9 @@ export default function Reader({bookId, onClose, settings, setSettings, themeSty
             const bookData = await db.books.get(bookId);
             if (!bookData || !isMounted) return;
 
+            setBookTitle(bookData.title || 'Titolo Sconosciuto');
+            setToc(bookData.toc || []);
+
             // Passiamo direttamente il riferimento al DOM
             await epubService.init({
                 bookData,
@@ -214,7 +217,7 @@ export default function Reader({bookId, onClose, settings, setSettings, themeSty
                     </Box>
 
                     {/* SEZIONE CENTRALE: La barra e le info */}
-                    <Box sx={{flex: 3, display: 'flex', flexDirection: 'column', gap: 0.5}}>
+                    <Box sx={{flex: 4, display: 'flex', flexDirection: 'column', gap: 0.5}}>
                         <Slider
                             value={bookProgress}
                             marks={chaptersMarks}
@@ -262,35 +265,63 @@ export default function Reader({bookId, onClose, settings, setSettings, themeSty
             </Box>
 
             {/* DRAWER INDICE */}
-            <Drawer anchor="left" open={isTocOpen} onClose={() => setIsTocOpen(false)}
-                    PaperProps={{
-                        sx: {
-                            width: {xs: '100%', sm: 360},
-                            p: 3,
-                            bgcolor: themeStyles.card,
-                            color: themeStyles.text,
-                            borderRadius: {xs: 0, sm: '0 16px 16px 0'},
-                            transition: 'background-color 0.3s ease'
-                        },
-                    }}
-
+            <Drawer
+                anchor="left"
+                open={isTocOpen}
+                onClose={() => setIsTocOpen(false)}
+                PaperProps={{
+                    sx: {
+                        width: {xs: '100%', sm: 360},
+                        bgcolor: themeStyles.card,
+                        color: themeStyles.text,
+                        borderRadius: {xs: 0, sm: '0 16px 16px 0'},
+                        display: 'flex', // Cruciale
+                        flexDirection: 'column', // Cruciale
+                        maxHeight: '100dvh' // Evita che il drawer sfori lo schermo
+                    },
+                }}
             >
-
-
-                <Box sx={{display: 'flex', flexDirection: 'column', height: '100%'}}>
+                {/* HEADER FISSO */}
+                <Box sx={{ p: 3, borderBottom: `1px solid ${themeStyles.border}` }}>
                     <Typography variant="h6" sx={{fontWeight: 800}}>Indice</Typography>
-                    <List sx={{overflowY: 'auto', p: 0}}>
+                </Box>
+
+                {/* LISTA SCROLLABILE */}
+                <Box sx={{
+                    flexGrow: 1,
+                    overflowY: 'auto', // Abilita lo scroll qui
+                    WebkitOverflowScrolling: 'touch', // Scroll fluido su iOS
+                    pb: 2 // Padding finale per non far toccare l'ultimo elemento al bordo
+                }}>
+                    <List sx={{ p: 0 }}>
                         {toc.map((chap, i) => (
                             <ListItem key={i} disablePadding divider sx={{borderColor: themeStyles.border}}>
-                                <ListItemButton onClick={() => {
-                                    setIsTocOpen(false);
-                                    epubService.goToChapterByIndex(i);
-                                }} selected={currentChapterIndex === i}>
-                                    <ListItemText primary={chap.label}
-                                                  primaryTypographyProps={{
-                                                      fontWeight: currentChapterIndex === i ? 600 : 400,
-                                                      color: currentChapterIndex === i ? themeStyles.primary : 'inherit'
-                                                  }}/>
+                                <ListItemButton
+                                    onClick={() => {
+                                        setIsTocOpen(false);
+                                        epubService.goToChapterByIndex(i);
+                                    }}
+                                    selected={currentChapterIndex === i}
+                                    sx={{
+                                        pl: 2 + (chap.level || 0) * 3,
+                                        ...(chap.level > 0 && currentChapterIndex === i && {
+                                            bgcolor: 'rgba(0,0,0,0.03)'
+                                        })
+                                    }}
+                                >
+                                    {chap.level > 0 && (
+                                        <Box sx={{ width: 4, height: 4, borderRadius: '50%', bgcolor: themeStyles.text, opacity: 0.3, mr: 1.5 }} />
+                                    )}
+
+                                    <ListItemText
+                                        primary={chap.label}
+                                        primaryTypographyProps={{
+                                            fontWeight: currentChapterIndex === i ? 600 : 400,
+                                            color: currentChapterIndex === i ? themeStyles.primary : 'inherit',
+                                            fontSize: chap.level > 0 ? '0.9rem' : '1rem',
+                                            opacity: chap.level > 0 && currentChapterIndex !== i ? 0.8 : 1
+                                        }}
+                                    />
                                 </ListItemButton>
                             </ListItem>
                         ))}

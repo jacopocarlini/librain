@@ -23,7 +23,8 @@ export const processEpubFile = async (file) => {
                             fr.onloadend = () => r(fr.result);
                             fr.readAsDataURL(blob);
                         });
-                    } catch (e) {}
+                    } catch (e) {
+                    }
                 }
 
                 await tempBook.ready;
@@ -32,17 +33,29 @@ export const processEpubFile = async (file) => {
                 const navigation = await tempBook.loaded.navigation;
                 let tocData = [];
 
-                const processItem = (item) => {
+                const processItem = (item, depth = 0) => { // <-- Aggiungiamo depth = 0
                     let safePct = 0;
                     if (item.href) {
                         const baseHref = item.href.split('#')[0];
                         const spineItem = tempBook.spine.get(baseHref);
                         if (spineItem) safePct = (spineItem.index / tempBook.spine.length);
                     }
-                    tocData.push({ label: item.label?.trim() || 'Capitolo', percent: safePct, href: item.href });
-                    if (item.subitems) item.subitems.forEach(processItem);
+
+                    tocData.push({
+                        label: item.label?.trim() || 'Capitolo',
+                        percent: safePct,
+                        href: item.href,
+                        level: depth // <-- Salviamo il livello di indentazione nel DB
+                    });
+
+                    // Se ci sono sottocapitoli, richiamiamo la funzione aumentando la profondità di 1
+                    if (item.subitems && item.subitems.length > 0) {
+                        item.subitems.forEach(sub => processItem(sub, depth + 1));
+                    }
                 };
-                navigation.toc.forEach(processItem);
+
+                // Avviamo il processo per i capitoli principali (livello 0)
+                navigation.toc.forEach(item => processItem(item, 0));
 
                 const result = {
                     title: metadata.title || 'Titolo Sconosciuto',
@@ -56,7 +69,9 @@ export const processEpubFile = async (file) => {
                 };
                 tempBook.destroy();
                 resolve(result);
-            } catch (err) { reject(err); }
+            } catch (err) {
+                reject(err);
+            }
         };
         reader.readAsArrayBuffer(file);
     });
@@ -70,7 +85,7 @@ class EpubService {
         this.currentSettings = null;
     }
 
-    async init({ bookData, elementId, settings, onReady, onRelocated }) {
+    async init({bookData, elementId, settings, onReady, onRelocated}) {
         // 1. Distruzione totale
         if (this.rendition) {
             this.rendition.destroy();
@@ -145,6 +160,57 @@ class EpubService {
     handleRelocated(locationData, callback) {
         const currentCfi = locationData.start.cfi;
         const percentage = this.book.locations?.percentageFromCfi(currentCfi) || 0;
+
+        let minutesLeftStr = '-- min';
+
+        if (this.book.locations && this.book.locations.length() > 0) {
+            // 1. Dati base per i calcoli
+            const currentLoc = this.book.locations.locationFromCfi(currentCfi);
+            const totalLocations = this.book.locations.length();
+
+            // 2. Calcolo per l'intero LIBRO
+            const remainingBookLocations = Math.max(0, totalLocations - currentLoc);
+            const estBookMinutes = Math.round(remainingBookLocations / 15);
+
+            // 3. Calcolo per il CAPITOLO
+            const nextChapterIndex = locationData.start.index + 1;
+            const nextChapter = this.book.spine.get(nextChapterIndex);
+
+            let endOfChapterLoc = totalLocations; // Default: se è l'ultimo cap, la fine è la fine del libro
+
+            // Troviamo la location di inizio del prossimo capitolo
+            if (nextChapter && nextChapter.href) {
+                // Epub.js può ricavare la location dal CFI base dell'elemento della spine
+                const nextChapterBaseCfi = `epubcfi(${nextChapter.cfiBase}!/4/1:0)`;
+                const nextLoc = this.book.locations.locationFromCfi(nextChapterBaseCfi);
+                // Se la location è valida, aggiorniamo la fine del capitolo
+                if (nextLoc && nextLoc > -1) {
+                    endOfChapterLoc = nextLoc;
+                }
+            }
+
+            const remainingChapterLocations = Math.max(0, endOfChapterLoc - currentLoc);
+            const estChapMinutes = Math.round(remainingChapterLocations / 15);
+
+            // 4. Funzione Helper per formattare il testo (es. 65 min -> 1h 5m)
+            const formatTime = (mins) => {
+                if (mins <= 0) return '< 1m';
+                if (mins < 60) return `${mins}m`;
+                const h = Math.floor(mins / 60);
+                const m = mins % 60;
+                return m > 0 ? `${h}h ${m}m` : `${h}h`;
+            };
+
+            // 5. Creazione della stringa combinata
+            if (percentage >= 0.99) {
+                minutesLeftStr = 'Finito';
+            } else {
+                // Esempio output: "12m cap • 3h 15m tot"
+                minutesLeftStr = `${formatTime(estChapMinutes)} cap • ${formatTime(estBookMinutes)} tot`;
+            }
+        }
+
+        // Identificazione titolo capitolo nel TOC
         let activeIndex = -1;
         if (this.bookData?.toc) {
             const cleanHref = locationData.start.href.split('#')[0];
@@ -157,19 +223,18 @@ class EpubService {
                 percentage: Number((percentage * 100).toFixed(1)),
                 chapterTitle: activeIndex !== -1 ? this.bookData.toc[activeIndex].label : 'Capitolo',
                 chapterIndex: activeIndex,
-                timeLeft: '-- min'
+                timeLeft: minutesLeftStr
             });
         }
     }
-
     applySettings(settings) {
         if (!this.rendition) return;
         this.currentSettings = settings;
 
         const themeConfigs = {
-            white: { bg: '#ffffff', text: '#000000' },
-            sepia: { bg: '#f4ecd8', text: '#5b4636' },
-            dark: { bg: '#121212', text: '#e0e0e0' }
+            white: {bg: '#ffffff', text: '#000000'},
+            sepia: {bg: '#f4ecd8', text: '#5b4636'},
+            dark: {bg: '#121212', text: '#e0e0e0'}
         };
         const active = themeConfigs[settings.theme] || themeConfigs.white;
 
@@ -280,7 +345,7 @@ class EpubService {
     }
 
     getChapterMarks() {
-        return this.bookData?.toc?.filter(c => c.percent > 0).map(c => ({ value: Number((c.percent * 100).toFixed(1)) })) || [];
+        return this.bookData?.toc?.filter(c => c.percent > 0).map(c => ({value: Number((c.percent * 100).toFixed(1))})) || [];
     }
 
     destroy() {
