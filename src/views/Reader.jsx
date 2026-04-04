@@ -20,6 +20,7 @@ import FormatListBulletedIcon from '@mui/icons-material/FormatListBulleted';
 import NavigateBeforeIcon from '@mui/icons-material/NavigateBefore';
 import NavigateNextIcon from '@mui/icons-material/NavigateNext';
 import {SettingsDrawer} from './Settings';
+import CloseIcon from '@mui/icons-material/Close';
 
 export default function Reader({bookId, onClose, settings, setSettings, themeStyles}) {
     const viewerRef = useRef(null);
@@ -169,7 +170,9 @@ export default function Reader({bookId, onClose, settings, setSettings, themeSty
                 sx={{
                     flexGrow: 1,
                     position: 'relative',
-                    overflow: 'hidden', // <-- DEVE essere sempre hidden! Lo scroll lo fa epub.js internamente
+                    overflow: 'hidden',
+                    px: { xs: 1, sm: 1 }, // <-- Spostiamo il padding sul contenitore padre
+                    boxSizing: 'border-box', // <-- Evita che il padding sfondi la larghezza dello schermo
                 }}
                 onClick={handleMarginClick}
             >
@@ -178,12 +181,10 @@ export default function Reader({bookId, onClose, settings, setSettings, themeSty
                     sx={{
                         height: '100%',
                         width: '100%',
-                        px: {xs: 1, sm: 4},
-                        // Reset forzato per evitare bug di epub.js che aggiunge inline styles
+                        // Padding rimosso da qui
                         '& .epub-container': {
                             height: '100% !important',
                             minWidth: '100% !important',
-                            // Se usi 'scrolled', l'iframe all'interno avrà la sua barra di scorrimento nativa
                         }
                     }}
                 />
@@ -271,27 +272,41 @@ export default function Reader({bookId, onClose, settings, setSettings, themeSty
                 onClose={() => setIsTocOpen(false)}
                 PaperProps={{
                     sx: {
-                        width: {xs: '100%', sm: 360},
+                        // 85% dello schermo su mobile per lasciare l'area cliccabile a destra
+                        width: { xs: '85vw', sm: 360 },
+                        maxWidth: 360,
+                        boxSizing: 'border-box', // Fondamentale per i calcoli di larghezza
                         bgcolor: themeStyles.card,
                         color: themeStyles.text,
-                        borderRadius: {xs: 0, sm: '0 16px 16px 0'},
-                        display: 'flex', // Cruciale
-                        flexDirection: 'column', // Cruciale
-                        maxHeight: '100dvh' // Evita che il drawer sfori lo schermo
+                        // Manteniamo gli angoli arrotondati a destra anche su mobile
+                        borderRadius: '0 16px 16px 0',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        maxHeight: '100dvh'
                     },
                 }}
             >
-                {/* HEADER FISSO */}
-                <Box sx={{ p: 3, borderBottom: `1px solid ${themeStyles.border}` }}>
-                    <Typography variant="h6" sx={{fontWeight: 800}}>Indice</Typography>
+                <Box sx={{
+                    p: { xs: 2, sm: 3 },
+                    borderBottom: `1px solid ${themeStyles.border}`,
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    alignItems: 'center'
+                }}>
+                    <Typography variant="h6" sx={{ fontWeight: 800, fontSize: { xs: '1.1rem', sm: '1.25rem' } }}>
+                        Indice
+                    </Typography>
+                    <IconButton onClick={() => setIsTocOpen(false)} size="small" sx={{ color: themeStyles.text, opacity: 0.5 }}>
+                        <CloseIcon />
+                    </IconButton>
                 </Box>
 
                 {/* LISTA SCROLLABILE */}
                 <Box sx={{
                     flexGrow: 1,
-                    overflowY: 'auto', // Abilita lo scroll qui
-                    WebkitOverflowScrolling: 'touch', // Scroll fluido su iOS
-                    pb: 2 // Padding finale per non far toccare l'ultimo elemento al bordo
+                    overflowY: 'auto',
+                    WebkitOverflowScrolling: 'touch',
+                    pb: 2
                 }}>
                     <List sx={{ p: 0 }}>
                         {toc.map((chap, i) => (

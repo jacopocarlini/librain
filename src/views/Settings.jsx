@@ -20,7 +20,6 @@ export const SettingsDrawer = ({ open, onClose, settings, setSettings, themeStyl
         setSettings(prev => ({ ...prev, [key]: value }));
     };
 
-    // Assicuriamoci che pageLayout abbia un valore di fallback
     const currentLayout = settings.pageLayout || 'single';
 
     return (
@@ -30,33 +29,43 @@ export const SettingsDrawer = ({ open, onClose, settings, setSettings, themeStyl
             onClose={onClose}
             PaperProps={{
                 sx: {
-                    width: { xs: '100%', sm: 360 },
-                    p: 3,
+                    // Usiamo 85vw su mobile per lasciare uno spazio a sinistra (sfondo cliccabile)
+                    // e impostiamo un limite massimo di 360px per tablet/desktop
+                    width: { xs: '85vw', sm: 360 },
+                    maxWidth: 360,
+                    p: { xs: 2, sm: 3 },
                     bgcolor: themeStyles.card,
                     color: themeStyles.text,
-                    borderRadius: { xs: 0, sm: '16px 0 0 16px' },
-                    transition: 'background-color 0.3s ease'
+                    // Manteniamo i bordi arrotondati anche su smartphone per un look più pulito
+                    borderRadius: '16px 0 0 16px',
+                    transition: 'background-color 0.3s ease',
+                    overflowY: 'auto',
+                    boxSizing: 'border-box' // <-- Fondamentale: impedisce al padding di allargare il contenitore
                 },
             }}
         >
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-                <Typography variant="h6" sx={{ fontWeight: 800 }}>Settings</Typography>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: { xs: 2, sm: 3 } }}>
+                <Typography variant="h6" sx={{ fontWeight: 800, fontSize: { xs: '1.1rem', sm: '1.25rem' } }}>
+                    Settings
+                </Typography>
                 <IconButton onClick={onClose} size="small" sx={{ color: themeStyles.text, opacity: 0.5 }}>
                     <CloseIcon />
                 </IconButton>
             </Box>
 
-            <Box sx={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+            {/* Gap dinamico: meno spazio tra le sezioni su mobile */}
+            <Box sx={{ display: 'flex', flexDirection: 'column', gap: { xs: 3, sm: 4 } }}>
+
                 {/* THEME */}
                 <Box>
-                    <Typography variant="subtitle2" sx={{ fontWeight: 'bold', mb: 2, opacity: 0.7 }}>Theme</Typography>
-                    <Box sx={{ display: 'flex', gap: 2.5 }}>
+                    <Typography variant="subtitle2" sx={{ fontWeight: 'bold', mb: 1.5, opacity: 0.7 }}>Theme</Typography>
+                    <Box sx={{ display: 'flex', gap: { xs: 2, sm: 2.5 } }}>
                         {themeOptions.map((opt) => (
                             <Box
                                 key={opt.id}
                                 onClick={() => updateSetting('theme', opt.id)}
                                 sx={{
-                                    width: 45, height: 45, borderRadius: '50%',
+                                    width: { xs: 40, sm: 45 }, height: { xs: 40, sm: 45 }, borderRadius: '50%',
                                     bgcolor: opt.color,
                                     border: `3px solid ${settings.theme === opt.id ? themeStyles.primary : 'transparent'}`,
                                     boxShadow: '0 4px 10px rgba(0,0,0,0.1)',
@@ -80,32 +89,31 @@ export const SettingsDrawer = ({ open, onClose, settings, setSettings, themeStyl
                         value={settings.fontSize}
                         onChange={(e, v) => updateSetting('fontSize', v)}
                         min={50} max={250} step={10}
-                        sx={{ color: themeStyles.primary }}
+                        sx={{ color: themeStyles.primary, py: { xs: 1, sm: 1.5 } }}
                     />
                 </Box>
 
                 <Divider sx={{ borderColor: themeStyles.border }} />
 
-                {/* ALIGNMENT */}
+                {/* JUSTIFY TEXT (Ex Alignment) */}
+                {/* JUSTIFY TEXT */}
                 <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                    <Typography variant="subtitle2" sx={{ fontWeight: 'bold', opacity: 0.7 }}>Alignment</Typography>
-                    <Box sx={{ bgcolor: themeStyles.paper, borderRadius: '12px', p: 0.5, display: 'flex', gap: 0.5 }}>
-                        {['left', 'justify'].map((align) => (
-                            <IconButton
-                                key={align}
-                                size="small"
-                                onClick={() => updateSetting('textAlign', align)}
-                                sx={{
-                                    bgcolor: settings.textAlign === align ? themeStyles.card : 'transparent',
-                                    color: settings.textAlign === align ? themeStyles.primary : 'grey.500',
-                                    borderRadius: '8px',
-                                    boxShadow: settings.textAlign === align ? '0 2px 6px rgba(0,0,0,0.1)' : 'none'
-                                }}
-                            >
-                                {align === 'left' ? <FormatAlignCenterIcon fontSize="small" /> : <FormatAlignJustifyIcon fontSize="small" />}
-                            </IconButton>
-                        ))}
-                    </Box>
+                    <Typography variant="subtitle2" sx={{ fontWeight: 'bold', opacity: 0.7 }}>
+                        Force Justify Text
+                    </Typography>
+                    <IconButton
+                        size="small"
+                        onClick={() => updateSetting('textAlign', settings.textAlign === 'justify' ? 'original' : 'justify')}
+                        sx={{
+                            bgcolor: settings.textAlign === 'justify' ? themeStyles.card : themeStyles.paper,
+                            color: settings.textAlign === 'justify' ? themeStyles.primary : 'grey.500',
+                            borderRadius: '8px',
+                            boxShadow: settings.textAlign === 'justify' ? '0 2px 6px rgba(0,0,0,0.1)' : 'none',
+                            p: 1 // Leggero padding per dare un'area di tocco migliore
+                        }}
+                    >
+                        <FormatAlignJustifyIcon fontSize="small" />
+                    </IconButton>
                 </Box>
 
                 <Divider sx={{ borderColor: themeStyles.border }} />
@@ -122,7 +130,8 @@ export const SettingsDrawer = ({ open, onClose, settings, setSettings, themeStyl
                             bgcolor: themeStyles.paper,
                             color: themeStyles.text,
                             '& fieldset': { border: 'none' },
-                            minWidth: 130
+                            minWidth: { xs: 110, sm: 130 },
+                            fontSize: { xs: '0.85rem', sm: '1rem' }
                         }}
                     >
                         <MenuItem value="Original">Originale</MenuItem>
@@ -137,7 +146,7 @@ export const SettingsDrawer = ({ open, onClose, settings, setSettings, themeStyl
 
                 {/* READING MODE */}
                 <Box>
-                    <Typography variant="subtitle2" sx={{ fontWeight: 'bold', opacity: 0.7, mb: 2 }}>Reading Mode</Typography>
+                    <Typography variant="subtitle2" sx={{ fontWeight: 'bold', opacity: 0.7, mb: 1.5 }}>Reading Mode</Typography>
                     <Box sx={{ bgcolor: themeStyles.paper, borderRadius: '16px', p: 0.5 }}>
                         <Tabs
                             value={settings.readingMode}
@@ -151,7 +160,12 @@ export const SettingsDrawer = ({ open, onClose, settings, setSettings, themeStyl
                                     value={index}
                                     label={label}
                                     sx={{
-                                        borderRadius: '12px', textTransform: 'none', fontWeight: 'bold', minHeight: 36,
+                                        borderRadius: '12px',
+                                        textTransform: 'none',
+                                        fontWeight: 'bold',
+                                        minHeight: { xs: 32, sm: 36 },
+                                        fontSize: { xs: '0.75rem', sm: '0.875rem' }, // Font più piccolo su mobile per evitare wrap
+                                        p: { xs: 0.5, sm: 1 },
                                         color: 'grey.500',
                                         '&.Mui-selected': { bgcolor: themeStyles.card, color: themeStyles.text }
                                     }}
@@ -161,12 +175,13 @@ export const SettingsDrawer = ({ open, onClose, settings, setSettings, themeStyl
                     </Box>
                 </Box>
 
-                {/* PAGE LAYOUT (Singola / Doppia) - Visibile SOLO se in modalità Paginata (0) */}
+                {/* PAGE LAYOUT (Singola / Doppia) */}
+                {/* PAGE LAYOUT (Singola / Doppia) - Nascosto su schermi piccoli (xs) */}
                 {settings.readingMode === 0 && (
-                    <>
-                        <Divider sx={{ borderColor: themeStyles.border }} />
+                    <Box sx={{ display: { xs: 'none', sm: 'block' } }}>
+                        <Divider sx={{ borderColor: themeStyles.border, mb: { xs: 3, sm: 4 } }} />
                         <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                            <Typography variant="subtitle2" sx={{ fontWeight: 'bold', opacity: 0.7 }}>Layout Pagine</Typography>
+                            <Typography variant="subtitle2" sx={{ fontWeight: 'bold', opacity: 0.7 }}>Page Layout</Typography>
                             <Box sx={{ bgcolor: themeStyles.paper, borderRadius: '12px', p: 0.5, display: 'flex', gap: 0.5 }}>
                                 {['single', 'double'].map((layout) => (
                                     <IconButton
@@ -185,7 +200,7 @@ export const SettingsDrawer = ({ open, onClose, settings, setSettings, themeStyl
                                 ))}
                             </Box>
                         </Box>
-                    </>
+                    </Box>
                 )}
 
             </Box>
