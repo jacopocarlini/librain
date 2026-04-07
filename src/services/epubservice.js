@@ -253,7 +253,7 @@ class EpubService {
 
             // Calcolo minuti totali
             const remainingBookLocations = Math.max(0, totalLocations - currentLoc);
-            timeStats.totalMinutes = Math.round(remainingBookLocations / 15);
+            timeStats.totalMinutes = Math.round(remainingBookLocations / 15) * 4;
 
             // Calcolo minuti capitolo
             const nextChapterIndex = locationData.start.index + 1;
@@ -267,7 +267,7 @@ class EpubService {
             }
 
             const remainingChapterLocations = Math.max(0, endOfChapterLoc - currentLoc);
-            timeStats.chapterMinutes = Math.round(remainingChapterLocations / 15);
+            timeStats.chapterMinutes = Math.round(remainingChapterLocations / 15) * 4;
 
             if (percentage >= 0.99) timeStats.isFinished = true;
         }
