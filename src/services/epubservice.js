@@ -137,9 +137,16 @@ class EpubService {
             manager: manager,
             flow: flow,
             allowScript: true,
-            method: "write"
+            method: "write",
+            allowScriptedContent: true
         });
         await this.rendition.display(bookData.currentCfi || undefined);
+
+        this.rendition.themes.default({
+            "body": {
+                "transition": "transform 0.3s ease-in-out" // Aggiunge fluidità
+            }
+        });
 
         this.applySettings(settings);
 
@@ -161,17 +168,30 @@ class EpubService {
         });
 
         this.rendition.hooks.content.register((contents) => {
-
-            // const doc = contents.document;
+            // const el = contents.document.documentElement;
             //
-            // // Blocca il menù contestuale (tasto destro o pressione prolungata)
-            // doc.addEventListener('contextmenu', (e) => {
-            //     e.preventDefault();
-            //     return false;
-            // }, {capture: true});
+            // // Fix per iOS: rende l'elemento cliccabile per Safari
+            // el.style.cursor = "pointer";
             //
-            // // Gestione Custom Selection (opzionale per il tuo menù futuro)
-            // // Se vorrai gestire la selezione "manuale", userai l'evento 'selected' di epub.js
+            // el.addEventListener('click', (e) => {
+            //
+            //     const selection = contents.window.getSelection().toString();
+            //     if (selection.length > 0) return;
+            //
+            //     // Recuperiamo la larghezza del viewport della rendition
+            //     const width = this.rendition.manager.container.clientWidth;
+            //
+            //     // Usiamo pageX o clientX dal touch/click
+            //     const x = e.clientX;
+            //
+            //     if (x < width * 0.25) {
+            //         this.prev();
+            //     } else if (x > width * 0.75) {
+            //         this.next();
+            //     }
+            //
+            //     if (onSelected) onSelected(null);
+            // });
         });
 
 
@@ -184,10 +204,12 @@ class EpubService {
             // }
         });
 
-        this.rendition.on('relocated', (data) => this.handleRelocated(data, onRelocated));
+        this.rendition.on('relocated', (data) => {
+
+            this.handleRelocated(data, onRelocated)
+        });
 
         this.rendition.on('click', (e) => {
-
             const contents = this.rendition.manager.getContents()[0];
             if (!contents) return;
             const selection = contents.window.getSelection().toString();
@@ -211,7 +233,6 @@ class EpubService {
         });
 
         this.rendition.on("contextmenu", (e) => {
-
             e.preventDefault();
         });
 
@@ -251,9 +272,12 @@ class EpubService {
             const currentLoc = this.book.locations.locationFromCfi(currentCfi);
             const totalLocations = this.book.locations.length();
 
+            const wpm = 250;
+            const caratteriPerParola = 6; // Media standard per l'italiano
+
             // Calcolo minuti totali
             const remainingBookLocations = Math.max(0, totalLocations - currentLoc);
-            timeStats.totalMinutes = Math.round(remainingBookLocations / 15) * 4;
+            timeStats.totalMinutes = Math.round((remainingBookLocations * (300/caratteriPerParola)) / wpm );
 
             // Calcolo minuti capitolo
             const nextChapterIndex = locationData.start.index + 1;
@@ -267,7 +291,7 @@ class EpubService {
             }
 
             const remainingChapterLocations = Math.max(0, endOfChapterLoc - currentLoc);
-            timeStats.chapterMinutes = Math.round(remainingChapterLocations / 15) * 4;
+            timeStats.chapterMinutes = Math.round((remainingChapterLocations * (300/caratteriPerParola)) / wpm );
 
             if (percentage >= 0.99) timeStats.isFinished = true;
         }
